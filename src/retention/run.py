@@ -71,6 +71,10 @@ def main() -> None:
     results = model.run(snaps, settings)
 
     fitted, split = results.pop("_fitted"), results.pop("_split")
+
+    bt = model.backtest(snaps, settings)
+    bt.to_csv(out / "backtest.csv", index=False)
+    results["backtest"] = model.summarize_backtest(bt)
     try:
         import shap
 

@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 import pandas as pd
 import pytest
 
@@ -68,3 +70,12 @@ def test_run_produces_metrics(snaps):
     assert {"rule_baseline", "logistic", "gradient_boosting"} <= set(results["models"])
     for scores in results["models"].values():
         assert 0 <= scores["pr_auc"] <= 1
+
+
+def test_backtest_folds_keep_the_gap(snaps):
+    settings = replace(Settings(), backtest_min_train_rows=1)
+    folds = list(model.backtest_folds(snaps, settings))
+    assert len(folds) > 1
+    for fold in folds:
+        assert fold.train["month"].max() + settings.label_months <= fold.test_month
+        assert (fold.test["month"] == fold.test_month).all()
