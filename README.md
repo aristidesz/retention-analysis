@@ -52,6 +52,8 @@ python -m retention.run            # writes reports/ (figures, CSVs, results.jso
 pytest -q                          # tests run on synthetic data, no real data needed
 ```
 
+To walk through the pipeline step by step, open `notebook/retention_walkthrough.ipynb` (install with `pip install -e ".[notebook]"`). It calls the package functions and shows the data after each step. It is committed without outputs because they contain per-user rows: clear outputs before committing it.
+
 Column names live in `src/retention/config.py`. If the export differs, the loader lists the columns it found.
 
 ## Limits
@@ -75,6 +77,7 @@ src/retention/
   snapshots.py  month-end snapshots from the core table (fallback)
   model.py      time split, baseline, models, metrics, threshold
   run.py        end-to-end pipeline
+notebook/       step-by-step walkthrough of the pipeline
 tests/          synthetic data and tests (labels, leakage, split gap)
 ```
 
