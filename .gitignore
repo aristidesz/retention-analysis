@@ -1,0 +1,12 @@
+# Data stays local: it is the company's take-home data
+data/
+*.csv
+*.parquet
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+.vscode

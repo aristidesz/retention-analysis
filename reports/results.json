@@ -1,0 +1,52 @@
+{
+  "test_month": "2018-03",
+  "train_rows": 4364,
+  "test_rows": 19570,
+  "churn_rate_test": 0.09626980071538069,
+  "break_even_probability": 0.3333333333333333,
+  "models": {
+    "rule_baseline": {
+      "pr_auc": 0.2906812780320208,
+      "roc_auc": 0.7474755723396557,
+      "recall_top_10pct": 0.46709129511677283,
+      "precision_top_10pct": 0.44966785896780787
+    },
+    "logistic": {
+      "pr_auc": 0.3761337826820616,
+      "roc_auc": 0.841680676092237,
+      "recall_top_10pct": 0.46656050955414013,
+      "precision_top_10pct": 0.44915687276443533,
+      "brier": 0.07083506241924564,
+      "expected_gain": 13360.000000000007
+    },
+    "gradient_boosting": {
+      "pr_auc": 0.3850841100044617,
+      "roc_auc": 0.8350634733819713,
+      "recall_top_10pct": 0.45063694267515925,
+      "precision_top_10pct": 0.4338272866632601,
+      "brier": 0.07462384095307795,
+      "expected_gain": 11500.0
+    }
+  },
+  "best_model": "gradient_boosting",
+  "importance": {
+    "opens_now": 0.1276,
+    "active_now": 0.0521,
+    "p2p_months_last_3": 0.0298,
+    "card_amount_last_3": 0.0231,
+    "active_months_last_3": 0.0185,
+    "card_trend": 0.0107,
+    "opens_trend": 0.0091,
+    "friends": 0.0081,
+    "age": 0.0056,
+    "searches_last_3": 0.0051,
+    "android_pay_before": 0.0018,
+    "chats_per_100_opens": 0.0013,
+    "overdraft_before": 0.001,
+    "months_since_last_active": 0.0001,
+    "opens_last_3": 0.0001,
+    "photo_before": 0.0,
+    "chats_last_3": -0.0003,
+    "tenure": -0.0008
+  }
+}
