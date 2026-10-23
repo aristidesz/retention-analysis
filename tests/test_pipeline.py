@@ -62,7 +62,7 @@ def test_features_do_not_change_when_the_future_changes(df):
 
 def test_time_split_has_gap(snaps):
     split = model.time_split(snaps, SETTINGS)
-    assert split.train["month"].max() + SETTINGS.label_months <= split.test_month
+    assert split.train["label_end"].max() <= split.test_start
 
 
 def test_run_produces_metrics(snaps):
@@ -77,5 +77,5 @@ def test_backtest_folds_keep_the_gap(snaps):
     folds = list(model.backtest_folds(snaps, settings))
     assert len(folds) > 1
     for fold in folds:
-        assert fold.train["month"].max() + settings.label_months <= fold.test_month
-        assert (fold.test["month"] == fold.test_month).all()
+        assert fold.train["label_end"].max() <= fold.test_start
+        assert fold.test["snap"].min() == fold.test_start

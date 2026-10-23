@@ -26,7 +26,13 @@ class Columns:
 @dataclass(frozen=True)
 class Settings:
     columns: Columns = field(default_factory=Columns)
+    # "daily": weekly snapshots from the raw daily tables. "core": month-end
+    # snapshots from the monthly core table (fallback).
+    input: str = "daily"
     core_path: str = "data/df_core.csv"
+    transactions_path: str = "data/df_transactions.csv"
+    daily_path: str = "data/df_users_activity_daily.csv"
+    users_path: str = "data/df_users.csv"
     reports_dir: str = "reports"
 
     # A user is active in a month if they made a payment (card or p2p).
@@ -34,6 +40,16 @@ class Settings:
 
     # Churn = no payment in the next `label_months` months after the snapshot.
     label_months: int = 2
+    # Daily input: churn = no payment in the next `label_days` days after a
+    # Monday snapshot; users must have paid in the `lookback_days` before it.
+    label_days: int = 60
+    lookback_days: int = 60
+    # p2p transfers below this many pounds are treated as test transfers and
+    # ignored (card amounts are real pounds; p2p has many +-0.01 rows).
+    min_p2p_amount: float = 1.0
+    # Backtest and final test use windows of this many days.
+    test_window_days: int = 28
+
     # Months of history needed before a snapshot can be scored.
     min_history_months: int = 2
     # Last fully observed month. June 2018 is partial in the source data.

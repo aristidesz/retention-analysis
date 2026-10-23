@@ -13,38 +13,58 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from retention.config import Settings
-from retention.snapshots import FEATURES
+# Columns that are not features
+META = ("user", "month", "snap", "label_end", "churn")
+
+
+def feature_columns(snapshots: pd.DataFrame) -> list[str]:
+    return [c for c in snapshots.columns if c not in META]
 
 
 @dataclass
 class Split:
     train: pd.DataFrame
     test: pd.DataFrame
-    test_month: pd.Period
+    test_start: pd.Timestamp
+    test_end: pd.Timestamp
+
+
+def window_split(snapshots: pd.DataFrame, end: pd.Timestamp, settings: Settings) -> Split | None:
+    """Test on the snapshots in the window ending at `end`. Train only on
+    snapshots whose label window ended before the test window starts."""
+    start = end - pd.Timedelta(days=settings.test_window_days)
+    test = snapshots[(snapshots["snap"] > start) & (snapshots["snap"] <= end)]
+    if test.empty:
+        return None
+    test_start = test["snap"].min()
+    train = snapshots[snapshots["label_end"] <= test_start]
+    return Split(train, test, test_start, test["snap"].max())
 
 
 def time_split(snapshots: pd.DataFrame, settings: Settings) -> Split:
-    """Test on the last snapshot month. Train only on snapshots whose label
-    window had already ended by then, so no future outcome is used."""
-    test_month = snapshots["month"].max()
-    train_end = test_month - settings.label_months
-    train = snapshots[snapshots["month"] <= train_end]
-    test = snapshots[snapshots["month"] == test_month]
-    if train.empty:
+    split = window_split(snapshots, snapshots["snap"].max(), settings)
+    if split.train.empty:
         raise ValueError("No training snapshots before the gap. Lower min_history_months.")
-    return Split(train, test, test_month)
+    return split
 
 
 def backtest_folds(snapshots: pd.DataFrame, settings: Settings):
-    """One Split per candidate test month, each with the same gap as time_split."""
-    for month in sorted(snapshots["month"].unique()):
-        train = snapshots[snapshots["month"] <= month - settings.label_months]
-        if len(train) >= settings.backtest_min_train_rows:
-            yield Split(train, snapshots[snapshots["month"] == month], month)
+    """Consecutive test windows back from the last snapshot, oldest first."""
+    folds = []
+    end, first = snapshots["snap"].max(), snapshots["snap"].min()
+    while end > first:
+        split = window_split(snapshots, end, settings)
+        if split and len(split.train) >= settings.backtest_min_train_rows:
+            folds.append(split)
+        end -= pd.Timedelta(days=settings.test_window_days)
+    return folds[::-1]
 
 
 def rule_baseline(df: pd.DataFrame) -> np.ndarray:
-    """What a team would do without a model: inactive this month = at risk."""
+    """What a team would do without a model: the longer since the last payment
+    (or the fewer recent active months), the higher the risk."""
+    if "days_since_last_payment" in df:
+        return df["days_since_last_payment"].to_numpy()
     return (1 - df["active_now"]).to_numpy() * 0.5 + (3 - df["active_months_last_3"]).to_numpy() / 6
 
 
@@ -96,8 +116,9 @@ def backtest(snapshots: pd.DataFrame, settings: Settings) -> pd.DataFrame:
     """Metrics per model for every test month that has enough training data."""
     rows = []
     for split in backtest_folds(snapshots, settings):
-        X_train, y_train = split.train[FEATURES], split.train["churn"].to_numpy()
-        X_test, y_test = split.test[FEATURES], split.test["churn"].to_numpy()
+        features = feature_columns(snapshots)
+        X_train, y_train = split.train[features], split.train["churn"].to_numpy()
+        X_test, y_test = split.test[features], split.test["churn"].to_numpy()
         if y_test.min() == y_test.max():
             continue
         scores = {"rule_baseline": rule_baseline(split.test)}
@@ -106,7 +127,8 @@ def backtest(snapshots: pd.DataFrame, settings: Settings) -> pd.DataFrame:
         for name, score in scores.items():
             rows.append(
                 {
-                    "test_month": str(split.test_month),
+                    "test_start": split.test_start.date(),
+                    "test_end": split.test_end.date(),
                     "train_rows": len(split.train),
                     "test_rows": len(split.test),
                     "churn_rate": y_test.mean(),
@@ -129,11 +151,13 @@ def summarize_backtest(bt: pd.DataFrame) -> dict:
 
 def run(snapshots: pd.DataFrame, settings: Settings) -> dict:
     split = time_split(snapshots, settings)
-    X_train, y_train = split.train[FEATURES], split.train["churn"].to_numpy()
-    X_test, y_test = split.test[FEATURES], split.test["churn"].to_numpy()
+    features = feature_columns(snapshots)
+    X_train, y_train = split.train[features], split.train["churn"].to_numpy()
+    X_test, y_test = split.test[features], split.test["churn"].to_numpy()
 
     results = {
-        "test_month": str(split.test_month),
+        "test_start": str(split.test_start.date()),
+        "test_end": str(split.test_end.date()),
         "train_rows": len(split.train),
         "test_rows": len(split.test),
         "churn_rate_test": float(y_test.mean()),
@@ -156,7 +180,7 @@ def run(snapshots: pd.DataFrame, settings: Settings) -> dict:
     )
     results["best_model"] = best
     results["importance"] = (
-        pd.Series(imp.importances_mean, index=FEATURES).sort_values(ascending=False).round(4).to_dict()
+        pd.Series(imp.importances_mean, index=features).sort_values(ascending=False).round(4).to_dict()
     )
     results["_fitted"] = fitted[best]
     results["_split"] = split
