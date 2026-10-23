@@ -32,6 +32,13 @@ FEATURES = [
 
 
 def build_snapshots(settings: Settings) -> pd.DataFrame:
+    return snapshot_features(load(settings), settings)
+
+
+def load(settings: Settings) -> duckdb.DuckDBPyConnection:
+    """Load the raw files into DuckDB and build the intermediate tables:
+    raw (every transaction), pay (payments only), mondays (snapshot dates),
+    snaps (who is scored on which Monday) and act (daily app use)."""
     con = duckdb.connect()
     con.execute("SET TimeZone='UTC'")
     thr, label, look = settings.min_p2p_amount, settings.label_days, settings.lookback_days
@@ -99,7 +106,12 @@ def build_snapshots(settings: Settings) -> pd.DataFrame:
         FROM read_csv('{settings.daily_path}', all_varchar=true)
         """
     )
+    return con
 
+
+def snapshot_features(con: duckdb.DuckDBPyConnection, settings: Settings) -> pd.DataFrame:
+    """One row per user per Monday: features from before it, label from after it."""
+    label = settings.label_days
     out = con.execute(
         f"""
         WITH
