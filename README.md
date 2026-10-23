@@ -4,6 +4,8 @@ Who stays, who leaves, and who to contact before they go. Built on a neobank's a
 
 The data is not in this repo. Put the exported tables in `data/` (git-ignored) and run the pipeline locally.
 
+**For an overview, start with [`notebook/retention_walkthrough.ipynb`](notebook/retention_walkthrough.ipynb).** It goes from the raw files to the results one step at a time, calling the package code and showing the data after each step. Charts and aggregate tables are saved in it. To re-run it locally: `pip install -e ".[notebook]"`, then `jupyter lab notebook/`.
+
 ## Questions
 
 1. How should engagement and retention be measured?
@@ -52,6 +54,8 @@ python -m retention.run            # writes reports/ (figures, CSVs, results.jso
 pytest -q                          # tests run on synthetic data, no real data needed
 ```
 
+Before committing the notebook after a re-run, remove the per-user outputs (tables of user rows, the single-user snapshot plots): `python notebook/scrub_outputs.py notebook/retention_walkthrough.ipynb`. The data is not ours to publish.
+
 Column names live in `src/retention/config.py`. If the export differs, the loader lists the columns it found.
 
 ## Limits
@@ -75,6 +79,7 @@ src/retention/
   snapshots.py  month-end snapshots from the core table (fallback)
   model.py      time split, baseline, models, metrics, threshold
   run.py        end-to-end pipeline
+notebook/       step-by-step walkthrough of the pipeline
 tests/          synthetic data and tests (labels, leakage, split gap)
 ```
 
