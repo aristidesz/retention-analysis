@@ -19,7 +19,7 @@ def load_core(settings: Settings) -> pd.DataFrame:
             f"Columns not found in {settings.core_path}: {missing}. "
             f"Available: {list(header)}. Update Columns in config.py."
         )
-    raw = pd.read_csv(settings.core_path, usecols=wanted)
+    raw = pd.read_csv(settings.core_path, usecols=wanted, low_memory=False)
     return prepare(raw, c)
 
 

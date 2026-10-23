@@ -35,6 +35,14 @@ def time_split(snapshots: pd.DataFrame, settings: Settings) -> Split:
     return Split(train, test, test_month)
 
 
+def backtest_folds(snapshots: pd.DataFrame, settings: Settings):
+    """One Split per candidate test month, each with the same gap as time_split."""
+    for month in sorted(snapshots["month"].unique()):
+        train = snapshots[snapshots["month"] <= month - settings.label_months]
+        if len(train) >= settings.backtest_min_train_rows:
+            yield Split(train, snapshots[snapshots["month"] == month], month)
+
+
 def rule_baseline(df: pd.DataFrame) -> np.ndarray:
     """What a team would do without a model: inactive this month = at risk."""
     return (1 - df["active_now"]).to_numpy() * 0.5 + (3 - df["active_months_last_3"]).to_numpy() / 6
@@ -68,6 +76,7 @@ def evaluate(y: np.ndarray, score: np.ndarray, settings: Settings) -> dict:
         "roc_auc": roc_auc_score(y, score),
         f"recall_top_{int(settings.top_share * 100)}pct": recall_top,
         f"precision_top_{int(settings.top_share * 100)}pct": precision_top,
+        f"lift_top_{int(settings.top_share * 100)}pct": precision_top / y.mean(),
     }
 
 
@@ -81,6 +90,41 @@ def expected_gain(y: np.ndarray, p: np.ndarray, settings: Settings) -> float:
     contact = p >= break_even_probability(settings)
     saved = y[contact].sum() * settings.offer_success_rate * settings.customer_value
     return saved - contact.sum() * settings.offer_cost
+
+
+def backtest(snapshots: pd.DataFrame, settings: Settings) -> pd.DataFrame:
+    """Metrics per model for every test month that has enough training data."""
+    rows = []
+    for split in backtest_folds(snapshots, settings):
+        X_train, y_train = split.train[FEATURES], split.train["churn"].to_numpy()
+        X_test, y_test = split.test[FEATURES], split.test["churn"].to_numpy()
+        if y_test.min() == y_test.max():
+            continue
+        scores = {"rule_baseline": rule_baseline(split.test)}
+        for name, model in make_models(settings).items():
+            scores[name] = model.fit(X_train, y_train).predict_proba(X_test)[:, 1]
+        for name, score in scores.items():
+            rows.append(
+                {
+                    "test_month": str(split.test_month),
+                    "train_rows": len(split.train),
+                    "test_rows": len(split.test),
+                    "churn_rate": y_test.mean(),
+                    "model": name,
+                    **evaluate(y_test, score, settings),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def summarize_backtest(bt: pd.DataFrame) -> dict:
+    """Mean and range of each metric per model across the test months."""
+    metrics = [c for c in bt.columns if c.startswith(("pr_auc", "roc_auc", "recall_top", "precision_top", "lift_top"))]
+    summary = bt.groupby("model")[metrics].agg(["mean", "min", "max"])
+    return {
+        model: {m: {k: float(summary.loc[model, (m, k)]) for k in ("mean", "min", "max")} for m in metrics}
+        for model in summary.index
+    }
 
 
 def run(snapshots: pd.DataFrame, settings: Settings) -> dict:
