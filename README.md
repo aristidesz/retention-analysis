@@ -4,6 +4,8 @@ Who stays, who leaves, and who to contact before they go. Built on a neobank's a
 
 The data is not in this repo. Put the exported tables in `data/` (git-ignored) and run the pipeline locally.
 
+**For an overview, start with [`notebook/retention_walkthrough.ipynb`](notebook/retention_walkthrough.ipynb).** It goes from the raw files to the results one step at a time, calling the package code and showing the data after each step. It has no saved outputs (they contain per-user rows), so run it locally: `pip install -e ".[notebook]"`, then `jupyter lab notebook/`.
+
 ## Questions
 
 1. How should engagement and retention be measured?
@@ -52,7 +54,7 @@ python -m retention.run            # writes reports/ (figures, CSVs, results.jso
 pytest -q                          # tests run on synthetic data, no real data needed
 ```
 
-To walk through the pipeline step by step, open `notebook/retention_walkthrough.ipynb` (install with `pip install -e ".[notebook]"`). It calls the package functions and shows the data after each step. It is committed without outputs because they contain per-user rows: clear outputs before committing it.
+The notebook is committed without outputs: clear them before committing it.
 
 Column names live in `src/retention/config.py`. If the export differs, the loader lists the columns it found.
 
