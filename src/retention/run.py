@@ -74,8 +74,8 @@ def main() -> None:
     try:
         import shap
 
-        explainer = shap.Explainer(fitted.predict_proba, split.train[snapshots.FEATURES].sample(200, random_state=0))
-        values = explainer(split.test[snapshots.FEATURES].sample(min(1000, len(split.test)), random_state=0))
+        explainer = shap.Explainer(fitted.predict_proba, split.train[snapshots.FEATURES].sample(100, random_state=0))
+        values = explainer(split.test[snapshots.FEATURES].sample(min(300, len(split.test)), random_state=0))
         shap.plots.beeswarm(values[:, :, 1], show=False)
         plt.tight_layout()
         plt.savefig(out / "shap_beeswarm.png", dpi=120)
