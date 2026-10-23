@@ -25,11 +25,13 @@ def retention_matrix(df: pd.DataFrame) -> pd.DataFrame:
     return matrix
 
 
-def engagement_by_tenure(df: pd.DataFrame) -> pd.DataFrame:
+def engagement_by_tenure(df: pd.DataFrame, min_users: int = 0) -> pd.DataFrame:
     """Per active user, by tenure: compares users at the same age.
 
     A plain daily average over everyone mixes new and old users. When the
     user base grows fast, that average moves even if nobody changed behaviour.
+    Tenures with fewer than `min_users` active users are dropped: a handful of
+    long-lived early users (testers, staff) would make the averages jump.
     """
     df = add_tenure(df)
     active = df[df["active"]]
@@ -42,7 +44,7 @@ def engagement_by_tenure(df: pd.DataFrame) -> pd.DataFrame:
         median_card_amount=("card", "median"),
     )
     out["chats_per_100_opens"] = 100 * out["chats_per_user"] / out["opens_per_user"]
-    return out
+    return out[out["active_users"] >= min_users]
 
 
 def chats_and_churn(df: pd.DataFrame, label_months: int) -> pd.DataFrame:

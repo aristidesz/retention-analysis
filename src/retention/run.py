@@ -59,7 +59,7 @@ def main() -> None:
     matrix.to_csv(out / "retention_matrix.csv")
     plot_retention(matrix, out / "retention_matrix.png")
 
-    engagement = cohorts.engagement_by_tenure(df)
+    engagement = cohorts.engagement_by_tenure(df, settings.min_active_users)
     engagement.to_csv(out / "engagement_by_tenure.csv")
     plot_engagement(engagement, out / "engagement_by_tenure.png")
 

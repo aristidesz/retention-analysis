@@ -58,6 +58,9 @@ class Settings:
     # Backtest: skip test months with fewer training rows than this.
     backtest_min_train_rows: int = 2000
 
+    # Engagement by tenure: drop tenures with fewer active users than this.
+    min_active_users: int = 200
+
     # Share of users a retention team can contact, for recall at the top.
     top_share: float = 0.10
 

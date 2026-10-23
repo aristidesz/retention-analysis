@@ -79,3 +79,11 @@ def test_backtest_folds_keep_the_gap(snaps):
     for fold in folds:
         assert fold.train["label_end"].max() <= fold.test_start
         assert fold.test["snap"].min() == fold.test_start
+
+
+def test_engagement_drops_thin_tenures(df):
+    full = cohorts.engagement_by_tenure(df)
+    cut = int(full["active_users"].median())
+    trimmed = cohorts.engagement_by_tenure(df, min_users=cut)
+    assert 0 < len(trimmed) < len(full)
+    assert (trimmed["active_users"] >= cut).all()
