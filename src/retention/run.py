@@ -10,7 +10,7 @@ import numpy as np
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from retention import cohorts, data, model, snapshots  # noqa: E402
+from retention import cohorts, daily, data, model, snapshots  # noqa: E402
 from retention.config import Settings  # noqa: E402
 
 
@@ -66,8 +66,8 @@ def main() -> None:
     chats = cohorts.chats_and_churn(df, settings.label_months)
     chats.to_csv(out / "chats_and_churn.csv")
 
-    snaps = snapshots.build_snapshots(df, settings)
-    print(f"Snapshots: {len(snaps):,} rows, months {snaps['month'].min()} to {snaps['month'].max()}")
+    snaps = daily.build_snapshots(settings) if settings.input == "daily" else snapshots.build_snapshots(df, settings)
+    print(f"Snapshots ({settings.input}): {len(snaps):,} rows, {snaps['snap'].min().date()} to {snaps['snap'].max().date()}")
     results = model.run(snaps, settings)
 
     fitted, split = results.pop("_fitted"), results.pop("_split")
@@ -75,11 +75,13 @@ def main() -> None:
     bt = model.backtest(snaps, settings)
     bt.to_csv(out / "backtest.csv", index=False)
     results["backtest"] = model.summarize_backtest(bt)
+    print(bt.round(3).to_string(index=False))
+    print(bt.drop(columns=["test_start", "test_end"]).groupby("model").mean(numeric_only=True).round(3).to_string())
     try:
         import shap
 
-        explainer = shap.Explainer(fitted.predict_proba, split.train[snapshots.FEATURES].sample(100, random_state=0))
-        values = explainer(split.test[snapshots.FEATURES].sample(min(300, len(split.test)), random_state=0))
+        explainer = shap.Explainer(fitted.predict_proba, split.train[model.feature_columns(split.train)].sample(100, random_state=0))
+        values = explainer(split.test[model.feature_columns(split.test)].sample(min(300, len(split.test)), random_state=0))
         shap.plots.beeswarm(values[:, :, 1], show=False)
         plt.tight_layout()
         plt.savefig(out / "shap_beeswarm.png", dpi=120)

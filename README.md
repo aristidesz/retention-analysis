@@ -21,11 +21,19 @@ The data is not in this repo. Put the exported tables in `data/` (git-ignored) a
 
 **Engagement per active user by tenure.** The user base grew fast, so a plain average over everyone moves even when nobody changes behaviour. Comparing users at the same tenure removes that mix effect.
 
-**Churn label.** At each month-end snapshot: churn = no payment in the next 2 months. Only users who have not already left are scored.
+**Input.** `Settings.input` picks the source. `daily` (default) builds weekly snapshots from the raw tables with DuckDB: `df_transactions.csv`, `df_users_activity_daily.csv`, `df_users.csv`. `core` is the fallback: month-end snapshots from `df_core.csv`. Cohorts and engagement by tenure always use `df_core.csv`.
 
-**Features from the past only.** Every feature uses months up to the snapshot. A test wipes all activity after a cut-off and checks that earlier features do not change.
+**What counts as a payment (daily input).** A card spend (refunds and zero amounts are not payments) or a p2p transfer of at least £1 in either direction (`min_p2p_amount`). Card amounts are real pounds; p2p has thousands of exactly +-0.01 rows, treated as test transfers and ignored. The pipeline prints how many rows this removes.
 
-**Time-based split with a gap.** Test on the last snapshot month. Train only on snapshots whose 2-month label window had closed by then.
+**Churn label.** Daily input: snapshots are Mondays; churn = no payment in the 60 days from the snapshot; only users who paid in the 60 days before are scored. Core input: month-end snapshots, no payment in the next 2 months, only users who have not already left.
+
+**Features from the past only.** Every feature uses data before the snapshot. A test wipes all activity after a cut-off and checks that earlier features do not change, for both inputs.
+
+**Daily features.** Days since last payment and last app open (capped at 90); payment count, card spend, p2p out and p2p in over 30 days; active payment days over 30 and 90 days; opens in the last 7 days and their trend against the daily average of the 21 days before; searches and chats over 30 days; chats per 100 opens; age and friends; android pay and photo events only if they happened before the snapshot.
+
+**Time-based split with a gap.** The final test is the last 4 weeks of snapshots. Train only on snapshots whose label window ended before the test window starts.
+
+**Backtest.** The same rule applied to consecutive 4-week test windows. Folds with fewer than 2,000 training rows are skipped. Every fold is written to `reports/backtest.csv` and printed, with the average per model also in `results.json`.
 
 **Baseline first.** A simple rule (not active this month, few active months) sets the bar. Then logistic regression and gradient boosting.
 
@@ -39,21 +47,32 @@ The data is not in this repo. Put the exported tables in `data/` (git-ignored) a
 
 ```sh
 pip install -e ".[dev,shap]"
-cp /path/to/df_core.csv data/
+cp /path/to/df_*.csv data/       # core, transactions, activity_daily, users
 python -m retention.run            # writes reports/ (figures, CSVs, results.json)
 pytest -q                          # tests run on synthetic data, no real data needed
 ```
 
 Column names live in `src/retention/config.py`. If the export differs, the loader lists the columns it found.
 
+## Limits
+
+- Transactions before Nov 2017 cover only a handful of users, so early snapshots are small and the earliest backtest folds are skipped.
+- The last usable snapshot is 60 days before the data ends (mid-June 2018), so recent behaviour is not in the test.
+- `age`, `friends_on_monzo` and the event dates come from a users table exported at the end of the period. Friends and age are not point-in-time values, so they may carry a little future information.
+- `offered_overdraft` is a 0/1 flag with no date in the users table, so it is not used in the daily input.
+- Days since last app open is capped at 90 days (a 90-day activity lookback).
+- p2p direction comes from the sign of the amount. The £1 test-transfer threshold is a judgment call, not a documented rule.
+- Offer cost, success rate and customer value are placeholders.
+
 ## Layout
 
 ```
 src/retention/
   config.py     settings and column names
-  data.py       load, active flag, observed window
+  data.py       load the core table, active flag, observed window
+  daily.py      weekly snapshots from the daily tables (DuckDB)
   cohorts.py    retention matrix, engagement by tenure, chats vs churn
-  snapshots.py  leakage-safe features and labels
+  snapshots.py  month-end snapshots from the core table (fallback)
   model.py      time split, baseline, models, metrics, threshold
   run.py        end-to-end pipeline
 tests/          synthetic data and tests (labels, leakage, split gap)

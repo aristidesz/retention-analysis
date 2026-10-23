@@ -94,6 +94,8 @@ def build_snapshots(df: pd.DataFrame, settings: Settings) -> pd.DataFrame:
     k = settings.label_months
     future = pd.concat([by_user["active"].shift(-i) for i in range(1, k + 1)], axis=1)
     out["label_known"] = future.notna().all(axis=1)
+    out["snap"] = g["month"].dt.end_time
+    out["label_end"] = (g["month"] + k).dt.end_time
     out["churn"] = (~future.fillna(False).astype(bool).any(axis=1)).astype(int)
 
     # Score only users who have not already left and have enough history
